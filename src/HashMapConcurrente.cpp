@@ -7,6 +7,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <thread>
 
 HashMapConcurrente::HashMapConcurrente()
 {
@@ -28,16 +29,10 @@ unsigned int HashMapConcurrente::hashIndex(std::string clave)
 void HashMapConcurrente::incrementar(std::string clave)
 {
     unsigned int index = this->hashIndex(clave);
-    std::lock_guard<std::mutex> lock(this->permisos_incrementar->at(index));
+    std::lock_guard<std::mutex> lock(this->permisos_incrementar[index]);
     for (auto it = tabla[index]->crearIt(); it.haySiguiente(); it.avanzar()) {
         if (it.siguiente().first == clave) {
             it.siguiente().second++;
-            if (this->curr_max->second < it.siguiente().second) {
-                permiso_max->lock();
-                this->curr_max->first = clave;
-                this->curr_max->second = it.siguiente().second;
-                permiso_max->unlock();
-            }
             return;
         }
     }
@@ -71,29 +66,47 @@ unsigned int HashMapConcurrente::valor(std::string clave)
 
 hashMapPair HashMapConcurrente::maximo()
 {
-    // hashMapPair *max = new hashMapPair();
-    // max->second = 0;
+    hashMapPair *max = new hashMapPair();
+    max->second = 0;
 
-    // for (unsigned int index = 0; index < HashMapConcurrente::cantLetras; index++) {
-    //     for (
-    //         auto it = tabla[index]->crearIt();
-    //         it.haySiguiente();
-    //         it.avanzar()) {
-    //         if (it.siguiente().second > max->second) {
-    //             max->first = it.siguiente().first;
-    //             max->second = it.siguiente().second;
-    //         }
-    //     }
-    // }
+    for (unsigned int index = 0; index < HashMapConcurrente::cantLetras; index++) {
+        std::lock_guard<std::mutex> lock(this->permisos_incrementar[index]);
+        for (
+            auto it = tabla[index]->crearIt();
+            it.haySiguiente();
+            it.avanzar()) {
+            if (it.siguiente().second > max->second) {
+                max->first = it.siguiente().first;
+                max->second = it.siguiente().second;
+            }
+        }
+    }
 
-    // return *max;
-    std::lock_guard<std::mutex> lock(*this->permiso_max);
-    return *(this->curr_max);
+    return *max;
+}
+
+hashMapPair HashMapConcurrente::max_() {
+    hashMapPair *max = new hashMapPair();
+    unsigned int index = this->proxima_fila.fetch_add(1);
+    std::lock_guard<std::mutex> lock(this->permisos_incrementar[index]);
+    for (auto it = tabla[index]->crearIt(); it.haySiguiente();it.avanzar()) {
+        if (it.siguiente().second > max->second) {
+            max->first = it.siguiente().first;
+            max->second = it.siguiente().second;
+        }
+    }
+
+    return *max;
 }
 
 hashMapPair HashMapConcurrente::maximoParalelo(unsigned int cantThreads)
 {
-    // Completar (Ejercicio 3)
+    std::vector<std::thread> threads;
+    std::vector<hashMapPair> maximos(this->cantLetras);
+    // for (unsigned int i = 0; i < cantThreads; i++) {
+    //     threads.emplace_back(max_);
+    //     // threads.emplace_back(this-maximo, std::ref(), filePaths[i]);
+    // }
 }
 
 #endif

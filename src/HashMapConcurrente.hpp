@@ -21,6 +21,7 @@ class HashMapConcurrente {
     unsigned int valor(std::string clave);
 
     hashMapPair maximo();
+    hashMapPair max_();
     hashMapPair maximoParalelo(unsigned int cantThreads);
 
    private:
@@ -30,7 +31,8 @@ class HashMapConcurrente {
 
     static unsigned int hashIndex(std::string clave);
 
-    std::vector<std::mutex> permisos_incrementar[HashMapConcurrente::cantLetras];
+    std::mutex permisos_incrementar[HashMapConcurrente::cantLetras];
+    std::atomic<unsigned int> proxima_fila = 0;
     std::mutex *permiso_max;
 };
 

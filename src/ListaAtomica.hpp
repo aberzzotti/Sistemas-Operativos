@@ -2,7 +2,6 @@
 #define LISTA_ATOMICA_HPP
 
 #include <atomic>
-#include <mutex>
 
 template <typename T>
 class ListaAtomica {
@@ -15,7 +14,6 @@ class ListaAtomica {
     };
 
     std::atomic<Nodo *> _cabeza;
-    std::mutex permiso_insertar;
 
    public:
     ListaAtomica() : _cabeza(nullptr) {}
@@ -33,13 +31,11 @@ class ListaAtomica {
 
     void insertar(const T &valor)
     {
-        this->permiso_insertar.lock();
-
         Nodo *nuevo = new Nodo(valor);
-        nuevo->_siguiente = this->_cabeza.load();
-        this->_cabeza.store(nuevo);
-
-        this->permiso_insertar.unlock();
+        nuevo->_siguiente = _cabeza.load();
+        while (!_cabeza.compare_exchange_weak(nuevo->_siguiente, nuevo)) {
+            ;
+        }
     }
 
     T &cabeza() const

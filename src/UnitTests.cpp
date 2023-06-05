@@ -187,6 +187,34 @@ LT_CHECK_EQ(actual.first, "tiranosaurio");
 LT_CHECK_EQ(actual.second, 4);
 LT_END_TEST(MaximoParaleloEsCorrectoDosThreads)
 
+LT_BEGIN_TEST(TestsEjercicio3, MaximoParaleloEsCorrectoNThreads)
+hM.incrementar("a");
+hM.incrementar("b");
+hM.incrementar("bar");
+hM.incrementar("bar");
+hM.incrementar("baz");
+hM.incrementar("c");
+hM.incrementar("d");
+hM.incrementar("e");
+hM.incrementar("f");
+hM.incrementar("foo");
+hM.incrementar("foo");
+hM.incrementar("foo");
+hM.incrementar("foo");
+hM.incrementar("foo");
+hM.incrementar("g");
+hM.incrementar("h");
+hM.incrementar("i");
+hM.incrementar("j");
+
+for (unsigned int i = 1; i < hM.cantLetras + 2; i++) {
+    hashMapPair actual = hM.maximoParalelo(i);
+    LT_CHECK_EQ(actual.first, "foo");
+    LT_CHECK_EQ(actual.second, 5);
+}
+
+LT_END_TEST(MaximoParaleloEsCorrectoNThreads)
+
 // Tests Ejercicio 4
 
 LT_BEGIN_SUITE(TestsEjercicio4)

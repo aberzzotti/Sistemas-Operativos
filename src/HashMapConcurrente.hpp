@@ -21,19 +21,14 @@ class HashMapConcurrente {
     unsigned int valor(std::string clave);
 
     hashMapPair maximo();
-    hashMapPair max_();
+    hashMapPair maximoPorIndice(unsigned int indice);
     hashMapPair maximoParalelo(unsigned int cantThreads);
 
    private:
     ListaAtomica<hashMapPair> *tabla[HashMapConcurrente::cantLetras];
-
-    hashMapPair *curr_max;
+    std::mutex *permisos_tabla[HashMapConcurrente::cantLetras];
 
     static unsigned int hashIndex(std::string clave);
-
-    std::mutex permisos_incrementar[HashMapConcurrente::cantLetras];
-    std::atomic<unsigned int> proxima_fila = 0;
-    std::mutex *permiso_max;
 };
 
 #endif /* HMC_HPP */

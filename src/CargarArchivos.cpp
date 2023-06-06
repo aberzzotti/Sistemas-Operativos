@@ -38,19 +38,36 @@ int cargarArchivo(
     return cant;
 }
 
-void cargarMultiplesArchivos(
-    HashMapConcurrente &hashMap,
-    unsigned int cantThreads,
-    std::vector<std::string> filePaths)
+struct cargarArchivosThreadArgs {
+    HashMapConcurrente &hash_map;
+    std::vector<std::string> *file_paths;
+    std::atomic<unsigned int> *proximo_index;
+};
+
+void *cargarArchivosThread(void *argv)
 {
-    std::vector<std::thread> threads;
-    for (unsigned int i = 0; i < cantThreads; i++) {
-        threads.emplace_back(cargarArchivo, std::ref(hashMap), filePaths[i]);
+    struct cargarArchivosThreadArgs *args = (struct cargarArchivosThreadArgs *)argv;
+
+    unsigned int i;
+    while ((i = args->proximo_index->fetch_add(1)) < args->file_paths->size()) {
+        cargarArchivo(args->hash_map, args->file_paths->at(i));
     }
 
-    for (unsigned int i = 0; i < cantThreads; i++) {
-        threads[i].join();
-    }
+    return nullptr;
 }
 
+void cargarMultiplesArchivos(HashMapConcurrente &hashMap, unsigned int cantThreads, std::vector<std::string> filePaths)
+{
+    std::atomic<unsigned int> proximo_index(0);
+    struct cargarArchivosThreadArgs args = {hashMap, &filePaths, &proximo_index};
+    std::vector<pthread_t> threads(cantThreads);
+
+    for (unsigned int i = 0; i < cantThreads; i++) {
+        pthread_create(&threads[i], NULL, cargarArchivosThread, &args);
+    }
+
+    for (unsigned int i = 0; i < cantThreads; i++) {
+        pthread_join(threads[i], NULL);
+    }
+}
 #endif

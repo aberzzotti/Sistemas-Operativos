@@ -65,16 +65,18 @@ unsigned int HashMapConcurrente::valor(std::string clave)
 
 hashMapPair HashMapConcurrente::maximo()
 {
-    hashMapPair *max = new hashMapPair("", 0);
+    bloquearListas();
 
+    hashMapPair *max = new hashMapPair("", 0);
     for (unsigned int index = 0; index < HashMapConcurrente::cantLetras; index++) {
-        std::lock_guard<std::mutex> lock(*permisos_tabla[index]);
         for (auto it = tabla[index]->crearIt(); it.haySiguiente(); it.avanzar()) {
             if (it.siguiente().second > max->second) {
                 max->first = it.siguiente().first;
                 max->second = it.siguiente().second;
             }
         }
+
+        permisos_tabla[index]->unlock();
     }
 
     return *max;
@@ -84,7 +86,6 @@ hashMapPair HashMapConcurrente::maximoPorIndice(unsigned int index)
 {
     hashMapPair *max = new hashMapPair("", 0);
 
-    std::lock_guard<std::mutex> lock(*permisos_tabla[index]);
     for (auto it = tabla[index]->crearIt(); it.haySiguiente(); it.avanzar()) {
         if (it.siguiente().second > max->second) {
             max->first = it.siguiente().first;
@@ -99,6 +100,7 @@ struct maximoThreadArgs {
     HashMapConcurrente *hash_map;
     std::atomic<unsigned int> *proximo_index;
     std::atomic<hashMapPair *> *maximo_global;
+    std::mutex **permisos;
 };
 
 void *maximoThread(void *argv)
@@ -109,6 +111,7 @@ void *maximoThread(void *argv)
 
     while ((index = args->proximo_index->fetch_add(1)) < args->hash_map->cantLetras) {
         hashMapPair index_max = args->hash_map->maximoPorIndice(index);
+        args->permisos[index]->unlock();
         if (index_max.second > thread_max->second) {
             *thread_max = index_max;
         }
@@ -124,11 +127,14 @@ void *maximoThread(void *argv)
 
 hashMapPair HashMapConcurrente::maximoParalelo(unsigned int cantThreads)
 {
+    bloquearListas();
+
     std::atomic<unsigned int> proximo_index(0);
     std::atomic<hashMapPair *> maximo(new hashMapPair("", 0));
     std::vector<pthread_t> threads(cantThreads);
+    std::vector<hashMapPair> maximos(cantThreads);
 
-    maximoThreadArgs args = (maximoThreadArgs){this, &proximo_index, &maximo};
+    maximoThreadArgs args = (maximoThreadArgs){this, &proximo_index, &maximo, permisos_tabla};
 
     for (unsigned int i = 0; i < cantThreads; i++) {
         pthread_create(&threads[i], NULL, maximoThread, &args);

@@ -29,6 +29,12 @@ class HashMapConcurrente {
     std::mutex *permisos_tabla[HashMapConcurrente::cantLetras];
 
     static unsigned int hashIndex(std::string clave);
+
+    void bloquearListas() {
+        for (unsigned int index = 0; index < HashMapConcurrente::cantLetras; index++) {
+            permisos_tabla[index]->lock();
+        }
+    }
 };
 
 #endif /* HMC_HPP */

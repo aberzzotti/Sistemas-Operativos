@@ -67,14 +67,14 @@ hashMapPair HashMapConcurrente::maximo()
 {
     hashMapPair *max = new hashMapPair("", 0);
 
+    for (unsigned int i = 0; i < cantLetras; i++) {
+        lockIndice(i);
+    }
+
     for (unsigned int index = 0; index < HashMapConcurrente::cantLetras; index++) {
-        std::lock_guard<std::mutex> lock(*permisos_tabla[index]);
-        for (auto it = tabla[index]->crearIt(); it.haySiguiente(); it.avanzar()) {
-            if (it.siguiente().second > max->second) {
-                max->first = it.siguiente().first;
-                max->second = it.siguiente().second;
-            }
-        }
+        hashMapPair max_local = maximoPorIndice(index);
+        *max = (max_local.second > max->second) ? max_local : *max;
+        unlockIndice(index);
     }
 
     return *max;
@@ -83,13 +83,8 @@ hashMapPair HashMapConcurrente::maximo()
 hashMapPair HashMapConcurrente::maximoPorIndice(unsigned int index)
 {
     hashMapPair *max = new hashMapPair("", 0);
-
-    std::lock_guard<std::mutex> lock(*permisos_tabla[index]);
     for (auto it = tabla[index]->crearIt(); it.haySiguiente(); it.avanzar()) {
-        if (it.siguiente().second > max->second) {
-            max->first = it.siguiente().first;
-            max->second = it.siguiente().second;
-        }
+        *max = (it.siguiente().second > max->second) ? it.siguiente() : *max;
     }
 
     return *max;
@@ -98,25 +93,20 @@ hashMapPair HashMapConcurrente::maximoPorIndice(unsigned int index)
 struct maximoThreadArgs {
     HashMapConcurrente *hash_map;
     std::atomic<unsigned int> *proximo_index;
-    std::atomic<hashMapPair *> *maximo_global;
+    hashMapPair *max;
 };
 
 void *maximoThread(void *argv)
 {
     maximoThreadArgs *args = (maximoThreadArgs *)argv;
-    hashMapPair *thread_max = new hashMapPair("", 0);
+
     unsigned int index;
-
     while ((index = args->proximo_index->fetch_add(1)) < args->hash_map->cantLetras) {
-        hashMapPair index_max = args->hash_map->maximoPorIndice(index);
-        if (index_max.second > thread_max->second) {
-            *thread_max = index_max;
-        }
-    }
+        hashMapPair max_local = args->hash_map->maximoPorIndice(index);
+        *(args->max) = (max_local.second > args->max->second) ? max_local : *(args->max);
 
-    hashMapPair *maximo_expected = args->maximo_global->load();
-    while (thread_max->second > maximo_expected->second && !args->maximo_global->compare_exchange_weak(maximo_expected, thread_max)) {
-        ;
+        // Desbloqueo lista ya recorrida
+        args->hash_map->unlockIndice(index);
     }
 
     return nullptr;
@@ -125,12 +115,20 @@ void *maximoThread(void *argv)
 hashMapPair HashMapConcurrente::maximoParalelo(unsigned int cantThreads)
 {
     std::atomic<unsigned int> proximo_index(0);
-    std::atomic<hashMapPair *> maximo(new hashMapPair("", 0));
     std::vector<pthread_t> threads(cantThreads);
 
-    maximoThreadArgs args = (maximoThreadArgs){this, &proximo_index, &maximo};
+    std::vector<hashMapPair> maximos(cantThreads);
+    for (unsigned int i = 0; i < cantThreads; i++) {
+        maximos.push_back(hashMapPair("", 0));
+    }
+
+    // Lockeamos el hashmap entero, luego a medida que van procesando los thread liberan la lista correspondiente
+    for (unsigned int i = 0; i < cantLetras; i++) {
+        lockIndice(i);
+    }
 
     for (unsigned int i = 0; i < cantThreads; i++) {
+        maximoThreadArgs args = (maximoThreadArgs){this, &proximo_index, &maximos[i]};
         pthread_create(&threads[i], NULL, maximoThread, &args);
     }
 
@@ -138,7 +136,14 @@ hashMapPair HashMapConcurrente::maximoParalelo(unsigned int cantThreads)
         pthread_join(threads[i], NULL);
     }
 
-    return *maximo.load();
+    hashMapPair maximo("", 0);
+    for (unsigned int i = 0; i < cantThreads; i++) {
+        if (maximos[i].second > maximo.second) {
+            maximo = maximos[i];
+        }
+    }
+
+    return maximo;
 }
 
 #endif

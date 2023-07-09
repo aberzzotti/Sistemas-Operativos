@@ -20,6 +20,19 @@ class HashMapConcurrente {
     std::vector<std::string> claves();
     unsigned int valor(std::string clave);
 
+    // Sync
+    inline void lockIndice(unsigned int indice)
+    {
+        (*permisos_tabla[indice]).lock();
+        return;
+    }
+
+    inline void unlockIndice(unsigned int indice)
+    {
+        (*permisos_tabla[indice]).unlock();
+        return;
+    }
+
     hashMapPair maximo();
     hashMapPair maximoPorIndice(unsigned int indice);
     hashMapPair maximoParalelo(unsigned int cantThreads);

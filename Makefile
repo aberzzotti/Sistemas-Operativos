@@ -22,7 +22,7 @@ $(BUILD_DIR)/%: src/%.cpp $(OBJECTS:%=$(BUILD_DIR)/%)
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
-.PHONY: all test build clean test_debug debug
+.PHONY: all test build clean test_debug debug benchmark
 
 build:
 	@mkdir -p $(BUILD_DIR)
@@ -32,6 +32,9 @@ test_debug: $(BUILD_DIR)/$(TEST_TARGET)
 
 debug: CXXFLAGS += -DDEBUG -g
 debug: all
+
+benchmark: CXXFLAGS += -lrt -D__BENCHMARK__
+benchmark: all
 
 clean:
 	-@rm -rvf $(BUILD_DIR)/*

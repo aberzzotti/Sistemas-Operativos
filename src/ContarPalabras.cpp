@@ -3,6 +3,16 @@
 #include "CargarArchivos.hpp"
 #include "HashMapConcurrente.hpp"
 
+double timespecToMs(struct timespec *spec)
+{
+    return spec->tv_sec * 1000 + (spec->tv_nsec * 1e-6);
+}
+
+double diffMs(struct timespec *start, struct timespec *end)
+{
+    return timespecToMs(end) - timespecToMs(start);
+}
+
 int main(int argc, char **argv)
 {
     if (argc < 4) {
@@ -29,10 +39,28 @@ int main(int argc, char **argv)
     }
 
     HashMapConcurrente hashMap = HashMapConcurrente();
+
+#ifdef __BENCHMARK__
+    struct timespec cargar_start, cargar_end, maximo_end;
+    clock_gettime(CLOCK_REALTIME, &cargar_start);
+#endif
+
     cargarMultiplesArchivos(hashMap, cantThreadsLectura, filePaths);
+
+#ifdef __BENCHMARK__
+    clock_gettime(CLOCK_REALTIME, &cargar_end);
+#endif
+
     auto maximo = hashMap.maximoParalelo(cantThreadsMaximo);
 
+#ifdef __BENCHMARK__
+    clock_gettime(CLOCK_REALTIME, &maximo_end);
+    std::cout << diffMs(&cargar_start, &cargar_end) << "," << diffMs(&cargar_end, &maximo_end) << "\n";
+#endif
+
+#ifndef __BENCHMARK__
     std::cout << maximo.first << " " << maximo.second << std::endl;
+#endif
 
     return 0;
 }
